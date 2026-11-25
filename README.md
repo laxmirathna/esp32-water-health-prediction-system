@@ -300,19 +300,10 @@ The OLED is configured with I²C address `0x3C`.
 ESP32-Water-Health-Prediction/
 │
 ├── README.md
-│
-├── Code/
-│   └── Water_Health_Prediction.ino
-│
-├── Hardware_Connections/
-│   ├── Hardware_Connections.pdf
-│   └── Pin_Configuration.png
-│
-└── Images/
-    ├── wokwi_circuit.png
-    ├── hardware_setup.png
-    ├── oled_display.png
-    └── serial_monitor.png
+├── ESP32 Water Health Prediction Diagram.png
+├── archictecture_image.jpg
+├── code_file.txt
+└── esp32_hardware_connections.txt
 ```
 
 The repository is organized to keep source code, hardware documentation, and visual references separate for easier understanding and maintenance.
