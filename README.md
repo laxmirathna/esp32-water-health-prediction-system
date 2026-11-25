@@ -105,10 +105,7 @@ The simulation design includes:
 - Breadboard power distribution
 - GPIO-based signal connections
 
-### Wokwi Circuit Diagram
 
-![ESP32 Water Health Prediction Wokwi Circuit](<img width="1536" height="1024" alt="ESP32 Water Health Prediction Diagram" src="https://github.com/user-attachments/assets/667e3a48-f598-45f9-b2b9-97860bebfb9b" />
-)
 
 
 ## ⚙️ 7. Working Principle
@@ -232,9 +229,8 @@ The SSD1306 OLED display is configured with four information pages.
 
 Each page is intended to appear for approximately three seconds.
 
-📌 **OLED Display Output:**
 
-![OLED Display](Images/oled_display.png)
+
 
 ## 🚨 11. Alert System
 
@@ -270,9 +266,6 @@ The system provides two primary output interfaces:
 - Early warnings.
 - Responsible parameter and reason.
 
-📌 **Serial Monitor Output:**
-
-![Serial Monitor Output](Images/serial_monitor.png)
 
 
 ## 💻 13. Software Requirements
