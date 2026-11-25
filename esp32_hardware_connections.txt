@@ -1,0 +1,50 @@
+===============================
+ESP32 WATER HEALTH PREDICTION
+FINAL CONNECTIONS
+===============================
+
+----------- pH Sensor -----------
+VCC  -> 3.3V
+GND  -> GND
+SIG  -> GPIO34
+
+----------- TDS Sensor ----------
+VCC  -> 3.3V
+GND  -> GND
+SIG  -> GPIO35
+
+------- Turbidity Sensor --------
+VCC  -> 3.3V
+GND  -> GND
+SIG  -> GPIO32
+
+----------- OLED SSD1306 --------
+VCC  -> 3.3V
+GND  -> GND
+SDA  -> GPIO21
+SCL  -> GPIO22
+
+----------- Green LED -----------
+GPIO18 -> 220Ω Resistor -> LED Anode(+)
+LED Cathode(-) -> GND
+
+----------- Yellow LED ----------
+GPIO19 -> 220Ω Resistor -> LED Anode(+)
+LED Cathode(-) -> GND
+
+------------ Red LED ------------
+GPIO5 -> 220Ω Resistor -> LED Anode(+)
+LED Cathode(-) -> GND
+
+------------- Buzzer ------------
+Positive (+) -> GPIO23
+Negative (-) -> GND
+
+----------- Power Rails ---------
+ESP32 3.3V -> Breadboard + Rail
+ESP32 GND  -> Breadboard - Rail
+
+All Sensor VCC -> + Rail
+All Sensor GND -> - Rail
+OLED VCC -> + Rail
+OLED GND -> - Rail

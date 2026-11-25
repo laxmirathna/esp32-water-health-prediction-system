@@ -1,0 +1,714 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+//====================================================
+// Pin Definitions
+//====================================================
+
+const int PH_PIN = 34;
+const int TDS_PIN = 35;
+const int TURBIDITY_PIN = 32;
+
+//====================================================
+// Raw ADC Values
+//====================================================
+
+int phADC;
+int tdsADC;
+int turbADC;
+
+//====================================================
+// Converted Sensor Values
+//====================================================
+
+float pH;
+int tds;
+int turbidity;
+// alert pins
+const int GREEN_LED=18;
+const int YELLOW_LED=19;
+const int RED_LED=5;
+const int BUZZER =23;
+//====================================================
+// Previous Values (Memory Layer)
+//====================================================
+
+//====================================================
+// Sensor History Buffer (Last 5 Readings)
+//====================================================
+float previousPH = 0;
+int previousTDS = 0;
+int previousTurbidity = 0;
+float phHistory[5] = {0};
+
+int tdsHistory[5] = {0};
+
+int turbHistory[5] = {0};
+
+int historyIndex = 0;
+
+//====================================================
+// Predicted Values
+//====================================================
+
+float predictedPH;
+int predictedTDS;
+int predictedTurbidity;
+
+//====================================================
+// Trend Strings
+//====================================================
+
+String phTrend;
+String tdsTrend;
+String turbidityTrend;
+String responsibleParameter;
+String reason;
+
+//====================================================
+// Decision Variables
+//====================================================
+
+int healthScore = 0;
+
+String status;
+
+bool phSafe;
+bool tdsSafe;
+bool turbiditySafe;
+
+String problems = "";
+String recommendation;
+String riskLevel;
+
+//====================================================
+// Store Sensor History
+//====================================================
+
+float averagePH()
+{
+  float sum = 0;
+
+  for(int i=0;i<5;i++)
+    sum += phHistory[i];
+
+  return sum/5.0;
+}
+
+int averageTDS()
+{
+  int sum = 0;
+
+  for(int i=0;i<5;i++)
+    sum += tdsHistory[i];
+
+  return sum/5;
+}
+
+int averageTurbidity()
+{
+  int sum = 0;
+
+  for(int i=0;i<5;i++)
+    sum += turbHistory[i];
+
+  return sum/5;
+}
+//====================================================
+// Read Sensors
+//====================================================
+
+void readSensors()
+{
+  phADC = analogRead(PH_PIN);
+  tdsADC = analogRead(TDS_PIN);
+  turbADC = analogRead(TURBIDITY_PIN);
+}
+
+//====================================================
+// Convert ADC To Engineering Units
+//====================================================
+
+void convertSensorValues()
+{
+  pH = (phADC * 14.0) / 4095.0;
+
+  tds = map(tdsADC, 0, 4095, 0, 1000);
+
+  turbidity = map(turbADC, 0, 4095, 0, 100);
+}
+
+//====================================================
+// Detect Trends
+//====================================================
+
+void detectTrends()
+{
+  if (pH > previousPH)
+    phTrend = "Increasing";
+  else if (pH < previousPH)
+    phTrend = "Decreasing";
+  else
+    phTrend = "Stable";
+
+  if (tds > previousTDS)
+    tdsTrend = "Increasing";
+  else if (tds < previousTDS)
+    tdsTrend = "Decreasing";
+  else
+    tdsTrend = "Stable";
+
+  if (turbidity > previousTurbidity)
+    turbidityTrend = "Increasing";
+  else if (turbidity < previousTurbidity)
+    turbidityTrend = "Decreasing";
+  else
+    turbidityTrend = "Stable";
+}
+
+//====================================================
+// Predict Future Values
+//====================================================
+
+void predictValues()
+{
+  predictedPH = pH + (pH - averagePH());
+
+  predictedTDS = tds + (tds - averageTDS());
+
+  predictedTurbidity = turbidity + (turbidity - averageTurbidity());
+}
+
+//====================================================
+// Save Current Values
+//====================================================
+
+void saveHistory()
+{
+  previousPH = pH;
+
+  previousTDS = tds;
+
+  previousTurbidity = turbidity;
+  
+
+  phHistory[historyIndex] = pH;
+
+  tdsHistory[historyIndex] = tds;
+
+  turbHistory[historyIndex] = turbidity;
+
+  historyIndex++;
+
+  if(historyIndex >= 5)
+    historyIndex = 0;
+}
+
+//====================================================
+// Calculate Water Health Score
+//====================================================
+
+void calculateHealthScore()
+{
+  healthScore = 0;
+
+  phSafe = (pH >= 6.5 && pH <= 8.5);
+  tdsSafe = (tds <= 300);
+  turbiditySafe = (turbidity <= 5);
+
+  if (phSafe)
+    healthScore += 33;
+
+  if (tdsSafe)
+    healthScore += 33;
+
+  if (turbiditySafe)
+    healthScore += 34;
+}
+
+//====================================================
+// Determine Water Status
+//====================================================
+
+void determineStatus()
+{
+  if (healthScore >= 90)
+    status = "Excellent";
+
+  else if (healthScore >= 75)
+    status = "Good";
+
+  else if (healthScore >= 60)
+    status = "Moderate";
+
+  else if (healthScore >= 40)
+    status = "Poor";
+
+  else
+    status = "Unsafe";
+}
+
+//====================================================
+// Identify All Problems
+//====================================================
+
+void identifyProblems()
+{
+  problems = "";
+
+  if (!phSafe)
+    problems += "High/Low pH\n";
+
+  if (!tdsSafe)
+    problems += "High TDS\n";
+
+  if (!turbiditySafe)
+    problems += "High Turbidity\n";
+
+  if (problems == "")
+    problems = "No Problems";
+}
+
+//====================================================
+// Generate Recommendation
+//====================================================
+
+void generateRecommendation()
+{
+  recommendation = "";
+
+  if (!phSafe)
+    recommendation += "Adjust pH\n";
+
+  if (!tdsSafe)
+    recommendation += "Reduce TDS\n";
+
+  if (!turbiditySafe)
+    recommendation += "Filter Water\n";
+
+  recommendation += "Verify before drinking";
+}
+
+//====================================================
+// Early Warning Logic
+//====================================================
+
+String earlyWarning()
+{
+  if (predictedTurbidity > 5)
+    return "Warning: Turbidity Rising";
+
+  if (predictedTDS > 300)
+    return "Warning: TDS Rising";
+
+  if (predictedPH < 6.5 || predictedPH > 8.5)
+    return "Warning: pH Changing";
+
+  return "No Early Warning";
+}
+
+//====================================================
+// Serial Monitor
+//====================================================
+
+void printSerialData()
+{
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("EDGE WATER QUALITY GUARDIAN");
+  Serial.println("========================================");
+
+  Serial.print("pH               : ");
+  Serial.println(pH,2);
+
+  Serial.print("TDS              : ");
+  Serial.print(tds);
+  Serial.println(" ppm");
+
+  Serial.print("Turbidity        : ");
+  Serial.print(turbidity);
+  Serial.println(" NTU");
+
+  Serial.println();
+
+  Serial.print("Health Score     : ");
+  Serial.println(healthScore);
+
+  Serial.print("Status           : ");
+  Serial.println(status);
+
+  Serial.println();
+
+  Serial.println("Problems:");
+  Serial.println(problems);
+
+  Serial.println();
+
+  Serial.println("Recommendation:");
+  Serial.println(recommendation);
+
+  Serial.println();
+
+  Serial.println("Current Trends");
+
+  Serial.print("pH         : ");
+  Serial.println(phTrend);
+
+  Serial.print("TDS        : ");
+  Serial.println(tdsTrend);
+
+  Serial.print("Turbidity  : ");
+  Serial.println(turbidityTrend);
+
+  Serial.println();
+
+  Serial.println("Predicted Values");
+
+  Serial.print("Predicted pH : ");
+  Serial.println(predictedPH,2);
+
+  Serial.print("Predicted TDS : ");
+  Serial.println(predictedTDS);
+
+  Serial.print("Predicted Turbidity : ");
+  Serial.println(predictedTurbidity);
+
+  Serial.println();
+
+  Serial.print("Early Warning : ");
+  Serial.println(earlyWarning());
+  Serial.print("Risk Level:");
+  Serial.println(riskLevel);
+ Serial.print("Responsible Parameter : ");
+ Serial.println(responsibleParameter);
+
+ Serial.print("Reason : ");
+ Serial.println(reason);
+  Serial.println("========================================");
+}
+//====================================================
+// Alert System
+//====================================================
+
+void updateAlerts()
+{
+  // Turn everything OFF first
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(YELLOW_LED, LOW);
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(BUZZER, LOW);
+
+  if (status == "Excellent")
+  {
+    digitalWrite(GREEN_LED, HIGH);
+  }
+
+  else if (status == "Good")
+  {
+    digitalWrite(GREEN_LED, HIGH);
+  }
+
+  else if (status == "Moderate")
+  {
+    digitalWrite(YELLOW_LED, HIGH);
+  }
+
+  else if (status == "Poor")
+  {
+    digitalWrite(YELLOW_LED, HIGH);
+
+    tone(BUZZER, 1000);
+    delay(200);
+    noTone(BUZZER);
+  }
+
+  else if (status == "Unsafe")
+  {
+    digitalWrite(RED_LED, HIGH);
+
+    tone(BUZZER, 2000);
+  }
+}
+int currentPage=0;
+unsigned long previousPageTime =0;
+const unsigned long pageInterval=3000;
+//====================================================
+// OLED Display (4 Pages)
+//====================================================
+
+void updateOLED()
+{
+  // Change page every 3 seconds
+  if (millis() - previousPageTime > pageInterval)
+  {
+    previousPageTime = millis();
+    currentPage++;
+
+    if (currentPage > 3)
+      currentPage = 0;
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+
+  //==========================
+  // PAGE 1 : LIVE VALUES
+  //==========================
+  if(currentPage == 0)
+  {
+    display.println("Edge Water Guardian");
+    display.println("----------------");
+
+    display.print("pH   : ");
+    display.println(pH,1);
+
+    display.print("TDS  : ");
+    display.print(tds);
+    display.println(" ppm");
+
+    display.print("Turb : ");
+    display.print(turbidity);
+    display.println(" NTU");
+  }
+
+  //==========================
+  // PAGE 2 : HEALTH
+  //==========================
+  else if(currentPage == 1)
+  {
+    display.println("Water Health");
+    display.println("----------------");
+
+    display.print("Score : ");
+    display.println(healthScore);
+
+    display.print("Status:");
+    display.println(status);
+
+    if(status == "Excellent" || status == "Good")
+      display.println("Safe to Drink");
+    else
+      display.println("Not Safe");
+  }
+
+  //==========================
+  // PAGE 3 : AI Prediction
+  //==========================
+  else if(currentPage == 2)
+  {
+    display.println("AI Prediction");
+    display.println("----------------");
+
+    display.print("pH : ");
+    display.println(predictedPH,1);
+
+    display.print("TDS: ");
+    display.println(predictedTDS);
+
+    display.print("Turb:");
+    display.println(predictedTurbidity);
+
+    display.println();
+
+    display.print("Risk : ");
+display.println(riskLevel);
+
+display.println();
+
+display.println(earlyWarning());
+  }
+//==========================
+// PAGE 4 : AI Decision
+//==========================
+else if(currentPage == 3)
+{
+  display.println("AI Decision");
+  display.println("----------------");
+
+  display.print("Main : ");
+  display.println(responsibleParameter);
+
+  display.print("Risk : ");
+  display.println(riskLevel);
+
+  display.println();
+
+  display.print("Action:");
+  display.println();
+
+  if(responsibleParameter == "pH")
+    display.println("Adjust pH");
+
+  else if(responsibleParameter == "TDS")
+    display.println("Reduce TDS");
+
+  else if(responsibleParameter == "Turbidity")
+    display.println("Filter Water");
+
+  else
+    display.println("No Action");
+
+  display.println();
+
+  display.println("Verify Before");
+  display.println("Drinking");
+}
+
+  display.display();
+}
+
+//====================================================
+// OLED Page Manager
+//====================================================
+
+void changePage()
+{
+  if (millis() - previousPageTime >= pageInterval)
+  {
+    previousPageTime = millis();
+
+    currentPage++;
+
+    if(currentPage > 4)
+      currentPage = 0;
+  }
+}
+//====================================================
+// AI Risk Analysis
+//====================================================
+
+void analyzeRisk()
+{
+  int riskCount = 0;
+
+  // Predicted pH
+  if(predictedPH < 6.5 || predictedPH > 8.5)
+    riskCount++;
+
+  // Predicted TDS
+  if(predictedTDS > 300)
+    riskCount++;
+
+  // Predicted Turbidity
+  if(predictedTurbidity > 5)
+    riskCount++;
+
+  if(riskCount == 0)
+    riskLevel = "LOW";
+
+  else if(riskCount == 1)
+    riskLevel = "MEDIUM";
+
+  else
+    riskLevel = "HIGH";
+}
+
+//====================================================
+// Responsible Parameter Analysis
+//====================================================
+
+void analyzeResponsibleParameter()
+{
+  responsibleParameter = "None";
+  reason = "All Parameters Normal";
+
+  float phDeviation = 0;
+
+  if(pH < 6.5)
+    phDeviation = 6.5 - pH;
+  else if(pH > 8.5)
+    phDeviation = pH - 8.5;
+
+  float tdsDeviation = max(0, tds - 300);
+
+  float turbDeviation = max(0, turbidity - 5);
+
+  if(phDeviation >= tdsDeviation && phDeviation >= turbDeviation && phDeviation > 0)
+  {
+    responsibleParameter = "pH";
+    reason = "pH outside safe range";
+  }
+
+  else if(tdsDeviation >= phDeviation && tdsDeviation >= turbDeviation && tdsDeviation > 0)
+  {
+    responsibleParameter = "TDS";
+    reason = "High dissolved solids";
+  }
+
+  else if(turbDeviation >= phDeviation && turbDeviation >= tdsDeviation && turbDeviation > 0)
+  {
+    responsibleParameter = "Turbidity";
+    reason = "High suspended particles";
+  }
+}
+//====================================================
+// Setup
+//====================================================
+
+void setup()
+{
+  Serial.begin(115200);
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC,0x3C))
+  {
+    Serial.println("OLED Failed");
+    while(true);
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+pinMode(GREEN_LED, OUTPUT);
+pinMode(YELLOW_LED, OUTPUT);
+pinMode(RED_LED, OUTPUT);
+pinMode(BUZZER, OUTPUT);
+  Serial.println("System Started...");
+}
+
+//====================================================
+// Main Loop
+//====================================================
+
+void loop()
+{
+ // Read sensors
+  readSensors();
+
+  // Convert ADC to engineering values
+  convertSensorValues();
+
+  // Compare with previous values
+  detectTrends();
+
+  // Predict future values
+  predictValues();
+  analyzeRisk();
+  analyzeResponsibleParameter();
+  // Decision Engine
+  calculateHealthScore();
+
+  determineStatus();
+
+  identifyProblems();
+
+  generateRecommendation();
+  updateAlerts();
+  changePage();
+  // User Interface
+  updateOLED();
+
+  printSerialData();
+
+  // Save values for next cycle
+  saveHistory();
+
+  delay(1000);
+}
